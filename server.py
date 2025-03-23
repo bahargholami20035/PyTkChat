@@ -1,35 +1,50 @@
-# server.py
-
 import socket
 import threading
 
+clients = {}
+lock = threading.Lock()
+
 def handle_client(client_socket, address):
     print(f"Accepted connection from {address}")
-
+    
     try:
+        username = client_socket.recv(1024).decode('utf-8').strip()
+        if not username.startswith("USERNAME:"):
+            client_socket.close()
+            return
+        
+        username = username.split(":", 1)[1]
+        with lock:
+            clients[client_socket] = username
+        
+        broadcast(f"{username} has joined the chat!", client_socket)
+        
         while True:
             message = client_socket.recv(1024).decode('utf-8')
             if not message:
                 break
-            print(f"Received from {address}: {message}")
-            broadcast(message, client_socket)
+            print(f"{username} ({address}): {message}")
+            broadcast(f"{username}: {message}", client_socket)
 
     except (ConnectionResetError, BrokenPipeError):
         print(f"Client {address} disconnected.")
+
     finally:
+        with lock:
+            del clients[client_socket]
         client_socket.close()
-        clients.remove(client_socket)
+        broadcast(f"{username} has left the chat.", None)
         print(f"Connection with {address} closed.")
 
-
 def broadcast(message, sender_socket):
-    for client in clients:
-        if client != sender_socket:
-            try:
-                client.sendall(message.encode('utf-8'))
-            except (ConnectionResetError, BrokenPipeError):
-                print(f"Error sending to a client.")
-
+    with lock:
+        for client in list(clients.keys()):
+            if client != sender_socket:
+                try:
+                    client.sendall(message.encode('utf-8'))
+                except (ConnectionResetError, BrokenPipeError):
+                    client.close()
+                    del clients[client]
 
 def start_server(host, port):
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -40,10 +55,7 @@ def start_server(host, port):
 
     while True:
         client_socket, address = server_socket.accept()
-        clients.append(client_socket)
-        threading.Thread(target=handle_client, args=(client_socket, address)).start()
-
-clients = []
+        threading.Thread(target=handle_client, args=(client_socket, address), daemon=True).start()
 
 if __name__ == "__main__":
     HOST = '127.0.0.1'
