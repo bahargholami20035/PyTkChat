@@ -67,6 +67,4 @@ You can run the *client* in a Google Colab notebook, while the *server* runs on 
 
 Contributions are welcome!  If you find a bug or have a feature suggestion, please open an issue or submit a pull request.
 
-## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details. (You'll need to create a `LICENSE` file with the MIT License text.)
